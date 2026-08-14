@@ -82,6 +82,11 @@ export class ChatPanel {
       case 'openLink':
         this.openLink(message.url ?? '')
         return
+      case 'copy':
+        if (typeof message.text === 'string') {
+          void vscode.env.clipboard.writeText(message.text)
+        }
+        return
     }
   }
 
@@ -190,7 +195,10 @@ export class ChatPanel {
     padding: 12px;
   }
   .msg { margin-bottom: 12px; max-width: 92%; word-wrap: break-word; }
-  .msg .role { font-size: 11px; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .msg .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+  .msg .role { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .msg .head .copy { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0 4px; }
+  .msg .head .copy:hover { color: var(--fg); text-decoration: underline; }
   .msg .body { padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
   .msg.user .body { background: var(--input-bg); white-space: pre-wrap; }
   .msg.assistant .body { background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
@@ -257,6 +265,7 @@ export class ChatPanel {
   <header>
     <div class="title">DeepSeek Harness <span id="status" class="status">idle</span></div>
     <div class="actions">
+      <button id="clear" class="secondary" title="Clear the conversation view">Clear</button>
       <button id="restart" class="secondary" title="Restart the agent">Restart</button>
       <button id="stop" class="secondary" title="Stop the agent">Stop</button>
     </div>
@@ -378,12 +387,26 @@ export class ChatPanel {
     function appendRole(role) {
       const el = document.createElement('div')
       el.className = 'msg ' + role
-      const roleEl = document.createElement('div')
+      const head = document.createElement('div')
+      head.className = 'head'
+      const roleEl = document.createElement('span')
       roleEl.className = 'role'
       roleEl.textContent = role === 'user' ? 'You' : 'Assistant'
+      const copyBtn = document.createElement('button')
+      copyBtn.className = 'copy'
+      copyBtn.title = 'Copy message'
+      copyBtn.textContent = 'Copy'
+      copyBtn.addEventListener('click', function () {
+        const bodyEl = el.querySelector('.body')
+        const text = (bodyEl && bodyEl.rawText) || (bodyEl && bodyEl.textContent) || ''
+        vscode.postMessage({ type: 'copy', text: text })
+      })
+      head.appendChild(roleEl)
+      head.appendChild(copyBtn)
       const body = document.createElement('div')
       body.className = 'body'
-      el.appendChild(roleEl)
+      body.rawText = ''
+      el.appendChild(head)
       el.appendChild(body)
       messages.appendChild(el)
       return body
@@ -410,24 +433,25 @@ export class ChatPanel {
           break
         case 'user': {
           const body = appendRole('user')
+          body.rawText = msg.text
           body.textContent = msg.text
           scrollToBottom()
           break
         }
         case 'assistantStart':
           activeAssistant = appendRole('assistant')
-          activeAssistant.raw = ''
+          activeAssistant.rawText = ''
           scrollToBottom()
           break
         case 'assistantChunk':
-          if (!activeAssistant) { activeAssistant = appendRole('assistant'); activeAssistant.raw = '' }
-          activeAssistant.raw = (activeAssistant.raw || '') + msg.text
-          activeAssistant.innerHTML = renderMarkdown(activeAssistant.raw)
+          if (!activeAssistant) { activeAssistant = appendRole('assistant'); activeAssistant.rawText = '' }
+          activeAssistant.rawText = (activeAssistant.rawText || '') + msg.text
+          activeAssistant.innerHTML = renderMarkdown(activeAssistant.rawText)
           scrollToBottom()
           break
         case 'assistantEnd': {
           if (activeAssistant) {
-            activeAssistant.innerHTML = renderMarkdown(activeAssistant.raw || '')
+            activeAssistant.innerHTML = renderMarkdown(activeAssistant.rawText || '')
             const stop = document.createElement('span')
             stop.className = 'stop'
             stop.textContent = '— ' + (msg.stopReason || 'done')
@@ -479,6 +503,10 @@ export class ChatPanel {
       }
     })
     cancelBtn.addEventListener('click', () => vscode.postMessage({ type: 'cancel' }))
+    document.getElementById('clear').addEventListener('click', () => {
+      messages.innerHTML = ''
+      activeAssistant = null
+    })
     document.getElementById('restart').addEventListener('click', () => vscode.postMessage({ type: 'restart' }))
     document.getElementById('stop').addEventListener('click', () => vscode.postMessage({ type: 'stop' }))
     document.addEventListener('click', (e) => {
