@@ -280,7 +280,7 @@ export class ChatPanel {
     </div>
   </header>
   <main id="messages"></main>
-  <details>
+  <details id="logdetails">
     <summary>Server log</summary>
     <pre id="log"></pre>
   </details>
@@ -494,6 +494,8 @@ export class ChatPanel {
           el.appendChild(body)
           messages.appendChild(el)
           activeAssistant = null
+          const logdetails = document.getElementById('logdetails')
+          if (logdetails) logdetails.open = true
           scrollToBottom()
           break
         }

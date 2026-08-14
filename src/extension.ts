@@ -6,6 +6,7 @@
  * the conversation and forwards user actions.
  */
 
+import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import * as vscode from 'vscode'
 import { AcpSession, type AcpSessionConfig, type PermissionChoice, type PermissionRequestInfo } from './acpSession.js'
@@ -41,8 +42,10 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
   const env = config.get<Record<string, string>>('server.env') ?? {}
   const permission = (config.get<string>('permission') ?? 'ask') as AcpSessionConfig['permission']
 
-  let args = config.get<string[]>('server.args') ?? []
-  if (args.length === 0) {
+  const configuredArgs = config.get<string[]>('server.args') ?? []
+  let args = configuredArgs
+  const usesDefaultArgs = args.length === 0
+  if (usesDefaultArgs) {
     if (!repoPath) {
       void vscode.window.showErrorMessage('DeepSeek Harness: set `dsh.server.args` or `dsh.server.repoPath` to launch the ACP server.')
       return
@@ -64,6 +67,14 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
     stop: () => void stop(),
     newChat: () => void newChat(),
   })
+
+  const { errors, warnings } = validateStartup({ command, args, repoPath, serverCwd, usesDefaultArgs, env })
+  for (const warning of warnings) panel.system(`Warning: ${warning}`)
+  if (errors.length > 0) {
+    for (const error of errors) panel.error(error)
+    void vscode.window.showErrorMessage(`DeepSeek Harness: ${errors[0]}`)
+    return
+  }
 
   panel.system(`Launching ACP server: ${command} ${args.join(' ')}`)
   panel.system(`Server working directory: ${serverCwd}`)
@@ -143,6 +154,51 @@ function resolveWorkspaceCwd(): string | undefined {
   const editor = vscode.window.activeTextEditor
   if (editor && !editor.document.isUntitled) return dirname(editor.document.uri.fsPath)
   return process.env.USERPROFILE || process.env.HOME || undefined
+}
+
+interface StartupValidation {
+  errors: string[]
+  warnings: string[]
+}
+
+function validateStartup(opts: {
+  command: string
+  args: string[]
+  repoPath: string
+  serverCwd: string
+  usesDefaultArgs: boolean
+  env: Record<string, string>
+}): StartupValidation {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  if (!opts.command.trim()) {
+    errors.push('`dsh.server.command` is empty.')
+  }
+
+  if (opts.usesDefaultArgs) {
+    if (!opts.repoPath) {
+      errors.push('`dsh.server.repoPath` is empty and `dsh.server.args` is not set — cannot build the launch command.')
+    } else if (!existsSync(opts.repoPath)) {
+      errors.push(`\`dsh.server.repoPath\` does not exist: ${opts.repoPath}`)
+    } else {
+      const bin = join(opts.repoPath, 'packages', 'examples', 'acp-demo', 'src', 'bin.ts')
+      const cfgPath = join(opts.repoPath, 'examples', 'acp-agent', 'cordis.yml')
+      if (!existsSync(bin)) errors.push(`ACP server entry not found: ${bin}`)
+      if (!existsSync(cfgPath)) errors.push(`ACP config not found: ${cfgPath}`)
+    }
+  }
+
+  const nodeMajor = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10)
+  if (nodeMajor < 22) {
+    warnings.push(`the harness requires Node 22.19+; the current runtime reports Node ${process.versions.node}.`)
+  }
+
+  if (!opts.env['DEEPSEEK_API_KEY'] && !process.env['DEEPSEEK_API_KEY']) {
+    warnings.push('no DEEPSEEK_API_KEY found in `dsh.server.env` or the environment; model calls will fail unless the server loads it from a repo-root .env.')
+  }
+
+  return { errors, warnings }
 }
 
 async function askPermission(req: PermissionRequestInfo): Promise<PermissionChoice> {
