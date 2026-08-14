@@ -47,6 +47,7 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
   const models = config.get<string[]>('models') ?? ['deepseek-v4-pro', 'deepseek-v4-flash']
   const serverEnv: Record<string, string> = { ...env, DSH_MODEL: model, DSH_PROVIDER: provider }
 
+  const ownConfigPath = vscode.Uri.joinPath(context.extensionUri, 'acp-cordis.yml').fsPath
   const configuredArgs = config.get<string[]>('server.args') ?? []
   let args = configuredArgs
   const usesDefaultArgs = args.length === 0
@@ -60,7 +61,7 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
       'tsx/esm',
       join(repoPath, 'packages', 'examples', 'acp-demo', 'src', 'bin.ts'),
       '--config',
-      join(repoPath, 'examples', 'acp-agent', 'cordis.yml'),
+      ownConfigPath,
     ]
   }
   const serverCwd = config.get<string>('server.cwd') || repoPath || sessionCwd
@@ -76,7 +77,7 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
 
   panel.setModels(models, model)
 
-  const { errors, warnings } = validateStartup({ command, args, repoPath, serverCwd, usesDefaultArgs, env })
+  const { errors, warnings } = validateStartup({ command, args, repoPath, serverCwd, usesDefaultArgs, env, ownConfigPath })
   for (const warning of warnings) panel.system(`Warning: ${warning}`)
   if (errors.length > 0) {
     for (const error of errors) panel.error(error)
@@ -192,6 +193,7 @@ function validateStartup(opts: {
   serverCwd: string
   usesDefaultArgs: boolean
   env: Record<string, string>
+  ownConfigPath: string
 }): StartupValidation {
   const errors: string[] = []
   const warnings: string[] = []
@@ -207,9 +209,8 @@ function validateStartup(opts: {
       errors.push(`\`dsh.server.repoPath\` does not exist: ${opts.repoPath}`)
     } else {
       const bin = join(opts.repoPath, 'packages', 'examples', 'acp-demo', 'src', 'bin.ts')
-      const cfgPath = join(opts.repoPath, 'examples', 'acp-agent', 'cordis.yml')
       if (!existsSync(bin)) errors.push(`ACP server entry not found: ${bin}`)
-      if (!existsSync(cfgPath)) errors.push(`ACP config not found: ${cfgPath}`)
+      if (!existsSync(opts.ownConfigPath)) errors.push(`Bundled ACP config not found: ${opts.ownConfigPath}`)
     }
   }
 

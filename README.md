@@ -78,12 +78,18 @@ Open **Settings → Extensions → DeepSeek Harness**, or set these in `settings
 }
 ```
 
-By default the extension launches the server with:
+By default the extension launches the server with its own bundled config
+(`acp-cordis.yml`) instead of the harness's example config, so no harness files
+need to be edited:
 
 ```
 node --import tsx/esm <repoPath>/packages/examples/acp-demo/src/bin.ts \
-     --config <repoPath>/examples/acp-agent/cordis.yml
+     --config <extension>/acp-cordis.yml
 ```
+
+The bundled config reads `DSH_MODEL` / `DSH_PROVIDER` from the environment, which the
+extension sets from the `dsh.model` / `dsh.provider` settings. Pick the model from the
+dropdown in the chat panel header; changing it restarts the agent.
 
 To use a different launcher (for example a built/npm-installed server), override
 `dsh.server.command` and `dsh.server.args` explicitly:

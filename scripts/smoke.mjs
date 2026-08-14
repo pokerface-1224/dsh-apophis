@@ -9,9 +9,11 @@
  */
 
 import { AcpSession } from '../dist/acpSession.js'
+import { fileURLToPath } from 'node:url'
 
 const repoPath = 'D:/deepseek-harness'
 const sessionCwd = 'D:/deepseek-harness-test'
+const configPath = fileURLToPath(new URL('../acp-cordis.yml', import.meta.url))
 
 const session = new AcpSession(
   {
@@ -21,11 +23,11 @@ const session = new AcpSession(
       'tsx/esm',
       `${repoPath}/packages/examples/acp-demo/src/bin.ts`,
       '--config',
-      `${repoPath}/examples/acp-agent/cordis.yml`,
+      configPath,
     ],
     cwd: repoPath,
     sessionCwd,
-    env: { DSH_SNAPSHOT_SESSIONS_ROOT: `${sessionCwd}/.dsh-smoke-sessions` },
+    env: { DSH_SNAPSHOT_SESSIONS_ROOT: `${sessionCwd}/.dsh-smoke-sessions`, DSH_MODEL: 'deepseek-v4-pro' },
     useShell: false,
     permission: 'reject',
   },
