@@ -132,6 +132,7 @@
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "vsce package",
     "vscode:prepublish": "npm run build"
   },
   "dependencies": {
@@ -141,6 +142,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "^5.6.0"
   }
 }
