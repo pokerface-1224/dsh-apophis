@@ -58,6 +58,10 @@ export class ChatPanel {
     context.subscriptions.push(this.panel)
   }
 
+  public reveal(): void {
+    this.panel.reveal()
+  }
+
   private dispose(): void {
     if (ChatPanel.current === this) ChatPanel.current = undefined
     while (this.disposables.length > 0) this.disposables.pop()!.dispose()

@@ -18,6 +18,7 @@ let panel: ChatPanel | undefined
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('dsh.startChat', () => void startChat(context)),
+    vscode.commands.registerCommand('dsh.openChat', () => void openChat(context)),
     vscode.commands.registerCommand('dsh.newChat', () => void newChat()),
     vscode.commands.registerCommand('dsh.restartChat', () => void restart(context)),
     vscode.commands.registerCommand('dsh.stopChat', () => void stop()),
@@ -105,6 +106,15 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
   } catch {
     // The failure is already surfaced through onError.
   }
+}
+
+async function openChat(context: vscode.ExtensionContext): Promise<void> {
+  const s = session
+  if (s && (s.currentStatus === 'ready' || s.currentStatus === 'busy' || s.currentStatus === 'starting')) {
+    panel?.reveal()
+    return
+  }
+  await startChat(context)
 }
 
 async function sendPrompt(text: string): Promise<void> {

@@ -32,13 +32,20 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onCommand:dsh.startChat"
+    "onCommand:dsh.startChat",
+    "onCommand:dsh.openChat"
   ],
   "contributes": {
     "commands": [
       {
         "command": "dsh.startChat",
         "title": "Start Chat",
+        "category": "DeepSeek Harness",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "dsh.openChat",
+        "title": "Open Chat",
         "category": "DeepSeek Harness",
         "icon": "$(comment-discussion)"
       },
@@ -61,6 +68,14 @@
         "icon": "$(debug-stop)"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "dsh.openChat",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "DeepSeek Harness",
       "properties": {
