@@ -41,9 +41,11 @@ const session = new AcpSession(
 try {
   await session.start()
   console.log('HANDSHAKE OK — status:', session.currentStatus)
+  await session.newSession()
+  console.log('NEW SESSION OK — status:', session.currentStatus)
   process.exitCode = 0
 } catch (err) {
-  console.error('HANDSHAKE FAILED:', err)
+  console.error('SMOKE FAILED:', err)
   process.exitCode = 1
 } finally {
   await session.dispose()

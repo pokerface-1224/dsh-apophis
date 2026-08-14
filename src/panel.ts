@@ -16,6 +16,7 @@ export interface PanelHandlers {
   cancel(): void
   restart(): void
   stop(): void
+  newChat(): void
 }
 
 function getNonce(): string {
@@ -79,6 +80,9 @@ export class ChatPanel {
       case 'stop':
         this.handlers.stop()
         return
+      case 'newChat':
+        this.handlers.newChat()
+        return
       case 'openLink':
         this.openLink(message.url ?? '')
         return
@@ -123,6 +127,10 @@ export class ChatPanel {
 
   public system(text: string): void {
     void this.panel.webview.postMessage({ type: 'system', text })
+  }
+
+  public clearView(): void {
+    void this.panel.webview.postMessage({ type: 'clear' })
   }
 
   public error(message: string): void {
@@ -266,6 +274,7 @@ export class ChatPanel {
     <div class="title">DeepSeek Harness <span id="status" class="status">idle</span></div>
     <div class="actions">
       <button id="clear" class="secondary" title="Clear the conversation view">Clear</button>
+      <button id="newchat" class="secondary" title="Start a fresh agent session">New Chat</button>
       <button id="restart" class="secondary" title="Restart the agent">Restart</button>
       <button id="stop" class="secondary" title="Stop the agent">Stop</button>
     </div>
@@ -465,6 +474,9 @@ export class ChatPanel {
           logEl.textContent += msg.text + '\\n'
           break
         }
+        case 'clear':
+          clearView()
+          break
         case 'system': {
           const el = document.createElement('div')
           el.className = 'msg system'
@@ -503,10 +515,12 @@ export class ChatPanel {
       }
     })
     cancelBtn.addEventListener('click', () => vscode.postMessage({ type: 'cancel' }))
-    document.getElementById('clear').addEventListener('click', () => {
+    function clearView() {
       messages.innerHTML = ''
       activeAssistant = null
-    })
+    }
+    document.getElementById('clear').addEventListener('click', clearView)
+    document.getElementById('newchat').addEventListener('click', () => vscode.postMessage({ type: 'newChat' }))
     document.getElementById('restart').addEventListener('click', () => vscode.postMessage({ type: 'restart' }))
     document.getElementById('stop').addEventListener('click', () => vscode.postMessage({ type: 'stop' }))
     document.addEventListener('click', (e) => {

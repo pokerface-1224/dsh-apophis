@@ -43,6 +43,12 @@
         "icon": "$(comment-discussion)"
       },
       {
+        "command": "dsh.newChat",
+        "title": "New Chat",
+        "category": "DeepSeek Harness",
+        "icon": "$(add)"
+      },
+      {
         "command": "dsh.restartChat",
         "title": "Restart Agent",
         "category": "DeepSeek Harness",

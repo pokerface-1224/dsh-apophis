@@ -17,6 +17,7 @@ let panel: ChatPanel | undefined
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('dsh.startChat', () => void startChat(context)),
+    vscode.commands.registerCommand('dsh.newChat', () => void newChat()),
     vscode.commands.registerCommand('dsh.restartChat', () => void restart(context)),
     vscode.commands.registerCommand('dsh.stopChat', () => void stop()),
   )
@@ -61,6 +62,7 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
     cancel: () => void session?.cancel(),
     restart: () => void restart(context),
     stop: () => void stop(),
+    newChat: () => void newChat(),
   })
 
   panel.system(`Launching ACP server: ${command} ${args.join(' ')}`)
@@ -104,6 +106,21 @@ async function sendPrompt(text: string): Promise<void> {
   panel?.assistantStart()
   try {
     await s.sendPrompt(text)
+  } catch (err: unknown) {
+    panel?.error(err instanceof Error ? err.message : String(err))
+  }
+}
+
+async function newChat(): Promise<void> {
+  const s = session
+  if (!s) {
+    panel?.error('No active agent session.')
+    return
+  }
+  try {
+    await s.newSession()
+    panel?.clearView()
+    panel?.system('Started a new agent session (same server connection).')
   } catch (err: unknown) {
     panel?.error(err instanceof Error ? err.message : String(err))
   }

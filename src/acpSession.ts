@@ -137,6 +137,11 @@ export class AcpSession {
   }
 
   private handleSessionUpdate(params: SessionNotification): Promise<void> {
+    // Ignore updates from orphaned sessions (e.g. after a new session replaced
+    // the active one on the same connection).
+    if (this.sessionId !== undefined && params.sessionId !== this.sessionId) {
+      return Promise.resolve()
+    }
     const update = params.update
     if (update.sessionUpdate === 'agent_message_chunk') {
       const content = update.content
@@ -195,6 +200,15 @@ export class AcpSession {
     } finally {
       if (!this.disposed) this.setStatus('ready')
     }
+  }
+
+  async newSession(): Promise<void> {
+    if (!this.conn) throw new Error('session is not connected')
+    if (this.status === 'busy' || this.status === 'starting') {
+      throw new Error('cannot start a new session while the agent is busy')
+    }
+    const { sessionId } = await this.conn.newSession({ cwd: this.config.sessionCwd, mcpServers: [] })
+    this.sessionId = sessionId
   }
 
   async cancel(): Promise<void> {
