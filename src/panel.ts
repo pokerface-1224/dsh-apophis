@@ -314,23 +314,23 @@ export class ChatPanel {
     }
 
     function safeUrl(url) {
-      return /^(https?:|#|\/|\.)/.test(url)
+      return /^(https?:|#|\\/|\\.)/.test(url)
     }
 
     function renderInline(s) {
       // s is already HTML-escaped; apply inline formatting without re-escaping.
-      s = s.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>')
-      s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, text, url) {
+      s = s.replace(/\\x60([^\\x60]+)\\x60/g, '<code>$1</code>')
+      s = s.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, function (m, text, url) {
         if (safeUrl(url)) return '<a href="' + url + '">' + text + '</a>'
         return m
       })
-      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      s = s.replace(/\\*\\*([^\\*]+)\\*\\*/g, '<strong>$1</strong>')
+      s = s.replace(/\\*([^\\*]+)\\*/g, '<em>$1</em>')
       return s
     }
 
     function renderMarkdown(src) {
-      const lines = String(src).split(/\r?\n/)
+      const lines = String(src).split(/\\r?\\n/)
       let html = ''
       let i = 0
       let inCode = false
@@ -340,14 +340,14 @@ export class ChatPanel {
 
       while (i < lines.length) {
         const line = lines[i]
-        const fence = line.match(/^\s*(\x60{3,}|~~~+)/)
+        const fence = line.match(/^\\s*(\\x60{3,}|~~~+)/)
         if (fence) {
           if (!inCode) {
             inCode = true
             codeLang = line.trim().slice(3).trim()
             codeBuf = []
           } else {
-            html += '<pre><code' + (codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : '') + '>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>'
+            html += '<pre><code' + (codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : '') + '>' + escapeHtml(codeBuf.join('\\n')) + '</code></pre>'
             inCode = false
             codeBuf = []
             codeLang = ''
@@ -358,41 +358,41 @@ export class ChatPanel {
         if (inCode) { codeBuf.push(line); i++; continue }
 
         const t = line.trim()
-        if (/^#{1,6}\s/.test(t)) {
-          const m = t.match(/^(#{1,6})\s+(.*)$/)
+        if (/^#{1,6}\\s/.test(t)) {
+          const m = t.match(/^(#{1,6})\\s+(.*)$/)
           const level = m[1].length
           html += '<h' + level + '>' + renderInline(escapeHtml(m[2])) + '</h' + level + '>'
           listType = null
           i++
           continue
         }
-        if (/^[-*+]\s+/.test(t)) {
+        if (/^[-*+]\\s+/.test(t)) {
           if (listType !== 'ul') { if (listType) html += '</' + listType + '>'; html += '<ul>'; listType = 'ul' }
-          html += '<li>' + renderInline(escapeHtml(t.replace(/^[-*+]\s+/, ''))) + '</li>'
+          html += '<li>' + renderInline(escapeHtml(t.replace(/^[-*+]\\s+/, ''))) + '</li>'
           i++
           continue
         }
-        if (/^\d+\.\s+/.test(t)) {
+        if (/^\\d+\\.\\s+/.test(t)) {
           if (listType !== 'ol') { if (listType) html += '</' + listType + '>'; html += '<ol>'; listType = 'ol' }
-          html += '<li>' + renderInline(escapeHtml(t.replace(/^\d+\.\s+/, ''))) + '</li>'
+          html += '<li>' + renderInline(escapeHtml(t.replace(/^\\d+\\.\\s+/, ''))) + '</li>'
           i++
           continue
         }
         if (listType) { html += '</' + listType + '>'; listType = null }
         if (t === '') { i++; continue }
-        if (/^>\s?/.test(t)) {
-          html += '<blockquote>' + renderInline(escapeHtml(t.replace(/^>\s?/, ''))) + '</blockquote>'
+        if (/^>\\s?/.test(t)) {
+          html += '<blockquote>' + renderInline(escapeHtml(t.replace(/^>\\s?/, ''))) + '</blockquote>'
           i++
           continue
         }
         const para = []
-        while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|\x60|~~~|[-*+]\s|\d+\.\s|>\s?)/.test(lines[i].trim())) {
+        while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\\s|\\x60|~~~|[-*+]\\s|\\d+\\.\\s|>\\s?)/.test(lines[i].trim())) {
           para.push(lines[i].trim())
           i++
         }
         html += '<p>' + renderInline(escapeHtml(para.join(' '))) + '</p>'
       }
-      if (inCode) html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>'
+      if (inCode) html += '<pre><code>' + escapeHtml(codeBuf.join('\\n')) + '</code></pre>'
       if (listType) html += '</' + listType + '>'
       return html
     }
