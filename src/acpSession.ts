@@ -53,6 +53,8 @@ export interface AcpSessionConfig {
 export interface AcpSessionCallbacks {
   onStatus(status: SessionStatus): void
   onAssistantChunk(text: string): void
+  onToolCall(toolCallId: string, title: string, rawInput: unknown): void
+  onToolUpdate(toolCallId: string, status: string, rawOutput: unknown): void
   onPromptEnded(stopReason: StopReason): void
   onLog(line: string): void
   onError(message: string): void
@@ -148,9 +150,12 @@ export class AcpSession {
       if (content.type === 'text' && content.text.length > 0) {
         this.cb.onAssistantChunk(content.text)
       }
+    } else if (update.sessionUpdate === 'tool_call') {
+      this.cb.onToolCall(update.toolCallId, update.title, update.rawInput)
+    } else if (update.sessionUpdate === 'tool_call_update') {
+      this.cb.onToolUpdate(update.toolCallId, update.status ?? '', update.rawOutput)
     }
-    // Other updates (thoughts, tool calls, plans, usage) are intentionally
-    // not surfaced: the ACP bridge emits only committed assistant text.
+    // Other updates (thoughts, plans, usage) are intentionally not surfaced.
     return Promise.resolve()
   }
 

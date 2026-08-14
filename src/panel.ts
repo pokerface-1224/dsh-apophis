@@ -135,6 +135,14 @@ export class ChatPanel {
     void this.panel.webview.postMessage({ type: 'assistantEnd', stopReason })
   }
 
+  public toolStart(toolCallId: string, title: string, rawInput: unknown): void {
+    void this.panel.webview.postMessage({ type: 'toolStart', toolCallId, title, rawInput })
+  }
+
+  public toolUpdate(toolCallId: string, status: string, rawOutput: unknown): void {
+    void this.panel.webview.postMessage({ type: 'toolUpdate', toolCallId, status, rawOutput })
+  }
+
   public log(line: string): void {
     void this.panel.webview.postMessage({ type: 'log', text: line })
   }
@@ -222,6 +230,11 @@ export class ChatPanel {
   .msg .role { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .msg .head .copy { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0 4px; }
   .msg .head .copy:hover { color: var(--fg); text-decoration: underline; }
+  .msg.tool .body { background: rgba(0,0,0,0.18); border: 1px solid var(--border); font-family: var(--vscode-editor-font-family, monospace); font-size: 11px; white-space: pre-wrap; }
+  .tool-status { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .tool-status.completed { color: #4ec9b0; }
+  .tool-status.failed { color: #f14c4c; }
+  .tool-status.in_progress { color: #dcdcaa; }
   .msg .body { padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
   .msg.user .body { background: var(--input-bg); white-space: pre-wrap; }
   .msg.assistant .body { background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
@@ -317,6 +330,7 @@ export class ChatPanel {
     const logEl = document.getElementById('log')
 
     let activeAssistant = null
+    const toolCards = new Map()
 
     function escapeHtml(s) {
       return String(s)
@@ -437,6 +451,46 @@ export class ChatPanel {
       return body
     }
 
+    function fmtRaw(value) {
+      if (typeof value !== 'string') return String(value ?? '')
+      try { return JSON.stringify(JSON.parse(value), null, 2) } catch { return value }
+    }
+
+    function renderToolCard(toolCallId, title, rawInput) {
+      const el = document.createElement('div')
+      el.className = 'msg tool'
+      const head = document.createElement('div')
+      head.className = 'head'
+      const label = document.createElement('span')
+      label.className = 'role'
+      label.textContent = title || 'tool'
+      const statusEl = document.createElement('span')
+      statusEl.className = 'tool-status in_progress'
+      statusEl.textContent = 'running'
+      head.appendChild(label)
+      head.appendChild(statusEl)
+      const body = document.createElement('div')
+      body.className = 'body'
+      body.textContent = fmtRaw(rawInput).slice(0, 500)
+      el.appendChild(head)
+      el.appendChild(body)
+      messages.appendChild(el)
+      toolCards.set(toolCallId, { statusEl, body })
+      scrollToBottom()
+    }
+
+    function updateToolCard(toolCallId, status, rawOutput) {
+      const card = toolCards.get(toolCallId)
+      if (!card) return
+      const display = status === 'completed' ? 'done' : status || 'updated'
+      card.statusEl.textContent = display
+      card.statusEl.className = 'tool-status ' + (status || '')
+      if (rawOutput !== undefined && rawOutput !== null && rawOutput !== '') {
+        card.body.textContent += '\\n' + fmtRaw(rawOutput).slice(0, 1000)
+      }
+      scrollToBottom()
+    }
+
     function scrollToBottom() {
       messages.scrollTop = messages.scrollHeight
     }
@@ -498,6 +552,12 @@ export class ChatPanel {
           scrollToBottom()
           break
         }
+        case 'toolStart':
+          renderToolCard(msg.toolCallId, msg.title, msg.rawInput)
+          break
+        case 'toolUpdate':
+          updateToolCard(msg.toolCallId, msg.status, msg.rawOutput)
+          break
         case 'log': {
           logEl.textContent += msg.text + '\\n'
           break

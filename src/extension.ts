@@ -103,6 +103,8 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
   const s = new AcpSession(cfg, {
     onStatus: (status) => panel?.setStatus(status),
     onAssistantChunk: (text) => panel?.appendAssistantChunk(text),
+    onToolCall: (toolCallId, title, rawInput) => panel?.toolStart(toolCallId, title, rawInput),
+    onToolUpdate: (toolCallId, status, rawOutput) => panel?.toolUpdate(toolCallId, status, rawOutput),
     onPromptEnded: (stopReason) => panel?.assistantEnd(stopReason),
     onLog: (line) => panel?.log(line),
     onError: (message) => panel?.error(message),
