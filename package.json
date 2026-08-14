@@ -5,6 +5,14 @@
   "version": "0.1.0",
   "publisher": "deepseek-harness",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pokerface-1224/dsh-apophis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pokerface-1224/dsh-apophis/issues"
+  },
+  "homepage": "https://github.com/pokerface-1224/dsh-apophis#readme",
   "type": "module",
   "engines": {
     "vscode": "^1.90.0"
