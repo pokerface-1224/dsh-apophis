@@ -17,6 +17,7 @@ export interface PanelHandlers {
   restart(): void
   stop(): void
   newChat(): void
+  setModel(model: string): void
 }
 
 function getNonce(): string {
@@ -68,7 +69,7 @@ export class ChatPanel {
     this.panel.dispose()
   }
 
-  private handleMessage(message: { type: string; text?: string; url?: string }): void {
+  private handleMessage(message: { type: string; text?: string; url?: string; model?: string }): void {
     switch (message.type) {
       case 'send':
         if (typeof message.text === 'string' && message.text.trim().length > 0) {
@@ -86,6 +87,11 @@ export class ChatPanel {
         return
       case 'newChat':
         this.handlers.newChat()
+        return
+      case 'setModel':
+        if (typeof message.model === 'string' && message.model.trim().length > 0) {
+          this.handlers.setModel(message.model)
+        }
         return
       case 'openLink':
         this.openLink(message.url ?? '')
@@ -107,6 +113,10 @@ export class ChatPanel {
 
   public setStatus(status: PanelStatus): void {
     void this.panel.webview.postMessage({ type: 'status', status })
+  }
+
+  public setModels(models: string[], current: string): void {
+    void this.panel.webview.postMessage({ type: 'models', models, current })
   }
 
   public appendUserMessage(text: string): void {
@@ -179,6 +189,7 @@ export class ChatPanel {
     border-bottom: 1px solid var(--border);
   }
   .title { font-weight: 600; }
+  .model-select { background: var(--input-bg); color: var(--fg); border: 1px solid var(--border); border-radius: 3px; padding: 2px 6px; font-size: 12px; max-width: 160px; }
   .status {
     display: inline-block;
     margin-left: 8px;
@@ -276,6 +287,7 @@ export class ChatPanel {
 <body>
   <header>
     <div class="title">DeepSeek Harness <span id="status" class="status">idle</span></div>
+    <select id="model" class="model-select" title="Model"></select>
     <div class="actions">
       <button id="clear" class="secondary" title="Clear the conversation view">Clear</button>
       <button id="newchat" class="secondary" title="Start a fresh agent session">New Chat</button>
@@ -441,6 +453,18 @@ export class ChatPanel {
     window.addEventListener('message', (event) => {
       const msg = event.data
       switch (msg.type) {
+        case 'models': {
+          const select = document.getElementById('model')
+          select.innerHTML = ''
+          for (const m of (msg.models || [])) {
+            const opt = document.createElement('option')
+            opt.value = m
+            opt.textContent = m
+            select.appendChild(opt)
+          }
+          select.value = msg.current || ''
+          break
+        }
         case 'status':
           setStatus(msg.status)
           break
@@ -525,6 +549,10 @@ export class ChatPanel {
       messages.innerHTML = ''
       activeAssistant = null
     }
+    document.getElementById('model').addEventListener('change', (e) => {
+      const v = e.target.value
+      if (v) vscode.postMessage({ type: 'setModel', model: v })
+    })
     document.getElementById('clear').addEventListener('click', clearView)
     document.getElementById('newchat').addEventListener('click', () => vscode.postMessage({ type: 'newChat' }))
     document.getElementById('restart').addEventListener('click', () => vscode.postMessage({ type: 'restart' }))

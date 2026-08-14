@@ -42,6 +42,10 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
   const useShell = config.get<boolean>('server.useShell') ?? false
   const env = config.get<Record<string, string>>('server.env') ?? {}
   const permission = (config.get<string>('permission') ?? 'ask') as AcpSessionConfig['permission']
+  const model = config.get<string>('model') ?? 'deepseek-v4-pro'
+  const provider = config.get<string>('provider') ?? 'deepseek-official'
+  const models = config.get<string[]>('models') ?? ['deepseek-v4-pro', 'deepseek-v4-flash']
+  const serverEnv: Record<string, string> = { ...env, DSH_MODEL: model, DSH_PROVIDER: provider }
 
   const configuredArgs = config.get<string[]>('server.args') ?? []
   let args = configuredArgs
@@ -67,7 +71,10 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
     restart: () => void restart(context),
     stop: () => void stop(),
     newChat: () => void newChat(),
+    setModel: (m) => void setModel(context, m),
   })
+
+  panel.setModels(models, model)
 
   const { errors, warnings } = validateStartup({ command, args, repoPath, serverCwd, usesDefaultArgs, env })
   for (const warning of warnings) panel.system(`Warning: ${warning}`)
@@ -88,7 +95,7 @@ async function startChat(context: vscode.ExtensionContext): Promise<void> {
     args,
     cwd: serverCwd,
     sessionCwd,
-    env,
+    env: serverEnv,
     useShell,
     permission,
     askPermission: (req) => askPermission(req),
@@ -145,6 +152,13 @@ async function newChat(): Promise<void> {
   } catch (err: unknown) {
     panel?.error(err instanceof Error ? err.message : String(err))
   }
+}
+
+async function setModel(context: vscode.ExtensionContext, model: string): Promise<void> {
+  const config = vscode.workspace.getConfiguration('dsh')
+  await config.update('model', model, vscode.ConfigurationTarget.Global)
+  panel?.system(`Switching model to ${model}…`)
+  await restart(context)
 }
 
 async function restart(context: vscode.ExtensionContext): Promise<void> {

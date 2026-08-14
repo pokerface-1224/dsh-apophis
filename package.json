@@ -115,6 +115,27 @@
             "type": "string"
           }
         },
+        "dsh.model": {
+          "type": "string",
+          "default": "deepseek-v4-pro",
+          "markdownDescription": "Model used for new agent sessions. Changing it restarts the agent."
+        },
+        "dsh.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "deepseek-v4-pro",
+            "deepseek-v4-flash"
+          ],
+          "markdownDescription": "Models offered in the chat panel's model selector."
+        },
+        "dsh.provider": {
+          "type": "string",
+          "default": "deepseek-official",
+          "markdownDescription": "Provider route used for new agent sessions."
+        },
         "dsh.permission": {
           "type": "string",
           "enum": [
