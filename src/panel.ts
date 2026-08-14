@@ -63,7 +63,7 @@ export class ChatPanel {
     this.panel.dispose()
   }
 
-  private handleMessage(message: { type: string; text?: string }): void {
+  private handleMessage(message: { type: string; text?: string; url?: string }): void {
     switch (message.type) {
       case 'send':
         if (typeof message.text === 'string' && message.text.trim().length > 0) {
@@ -79,7 +79,15 @@ export class ChatPanel {
       case 'stop':
         this.handlers.stop()
         return
+      case 'openLink':
+        this.openLink(message.url ?? '')
+        return
     }
+  }
+
+  private openLink(url: string): void {
+    if (!/^https?:\/\//i.test(url)) return
+    void vscode.env.openExternal(vscode.Uri.parse(url))
   }
 
   // ---- extension → webview ----
@@ -181,12 +189,25 @@ export class ChatPanel {
     overflow-y: auto;
     padding: 12px;
   }
-  .msg { margin-bottom: 12px; max-width: 92%; white-space: pre-wrap; word-wrap: break-word; }
+  .msg { margin-bottom: 12px; max-width: 92%; word-wrap: break-word; }
   .msg .role { font-size: 11px; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .msg .body { padding: 8px 10px; border-radius: 6px; }
-  .msg.user .body { background: var(--input-bg); }
+  .msg .body { padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+  .msg.user .body { background: var(--input-bg); white-space: pre-wrap; }
   .msg.assistant .body { background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
   .msg .stop { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .msg .body p { margin: 0 0 8px; }
+  .msg .body p:last-child { margin-bottom: 0; }
+  .msg .body h1, .msg .body h2, .msg .body h3, .msg .body h4, .msg .body h5, .msg .body h6 { margin: 12px 0 6px; font-weight: 600; line-height: 1.25; }
+  .msg .body h1 { font-size: 1.4em; }
+  .msg .body h2 { font-size: 1.25em; }
+  .msg .body h3 { font-size: 1.1em; }
+  .msg .body code { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.9em; background: rgba(128,128,128,0.2); padding: 1px 4px; border-radius: 3px; }
+  .msg .body pre { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; overflow-x: auto; margin: 8px 0; }
+  .msg .body pre code { background: none; padding: 0; font-size: 12px; }
+  .msg .body ul, .msg .body ol { margin: 0 0 8px; padding-left: 20px; }
+  .msg .body blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding: 2px 10px; color: var(--muted); }
+  .msg .body a { color: var(--vscode-textLink-foreground, #3794ff); text-decoration: none; }
+  .msg .body a:hover { text-decoration: underline; }
   .msg.system { color: var(--muted); font-style: italic; }
   .msg.error .body { border: 1px solid #f14c4c; color: #f14c4c; }
   details {
@@ -263,6 +284,97 @@ export class ChatPanel {
 
     let activeAssistant = null
 
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    }
+
+    function safeUrl(url) {
+      return /^(https?:|#|\/|\.)/.test(url)
+    }
+
+    function renderInline(s) {
+      // s is already HTML-escaped; apply inline formatting without re-escaping.
+      s = s.replace(/\x60([^\x60]+)\x60/g, '<code>$1</code>')
+      s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, text, url) {
+        if (safeUrl(url)) return '<a href="' + url + '">' + text + '</a>'
+        return m
+      })
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      return s
+    }
+
+    function renderMarkdown(src) {
+      const lines = String(src).split(/\r?\n/)
+      let html = ''
+      let i = 0
+      let inCode = false
+      let codeBuf = []
+      let codeLang = ''
+      let listType = null
+
+      while (i < lines.length) {
+        const line = lines[i]
+        const fence = line.match(/^\s*(\x60{3,}|~~~+)/)
+        if (fence) {
+          if (!inCode) {
+            inCode = true
+            codeLang = line.trim().slice(3).trim()
+            codeBuf = []
+          } else {
+            html += '<pre><code' + (codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : '') + '>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>'
+            inCode = false
+            codeBuf = []
+            codeLang = ''
+          }
+          i++
+          continue
+        }
+        if (inCode) { codeBuf.push(line); i++; continue }
+
+        const t = line.trim()
+        if (/^#{1,6}\s/.test(t)) {
+          const m = t.match(/^(#{1,6})\s+(.*)$/)
+          const level = m[1].length
+          html += '<h' + level + '>' + renderInline(escapeHtml(m[2])) + '</h' + level + '>'
+          listType = null
+          i++
+          continue
+        }
+        if (/^[-*+]\s+/.test(t)) {
+          if (listType !== 'ul') { if (listType) html += '</' + listType + '>'; html += '<ul>'; listType = 'ul' }
+          html += '<li>' + renderInline(escapeHtml(t.replace(/^[-*+]\s+/, ''))) + '</li>'
+          i++
+          continue
+        }
+        if (/^\d+\.\s+/.test(t)) {
+          if (listType !== 'ol') { if (listType) html += '</' + listType + '>'; html += '<ol>'; listType = 'ol' }
+          html += '<li>' + renderInline(escapeHtml(t.replace(/^\d+\.\s+/, ''))) + '</li>'
+          i++
+          continue
+        }
+        if (listType) { html += '</' + listType + '>'; listType = null }
+        if (t === '') { i++; continue }
+        if (/^>\s?/.test(t)) {
+          html += '<blockquote>' + renderInline(escapeHtml(t.replace(/^>\s?/, ''))) + '</blockquote>'
+          i++
+          continue
+        }
+        const para = []
+        while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|\x60|~~~|[-*+]\s|\d+\.\s|>\s?)/.test(lines[i].trim())) {
+          para.push(lines[i].trim())
+          i++
+        }
+        html += '<p>' + renderInline(escapeHtml(para.join(' '))) + '</p>'
+      }
+      if (inCode) html += '<pre><code>' + escapeHtml(codeBuf.join('\n')) + '</code></pre>'
+      if (listType) html += '</' + listType + '>'
+      return html
+    }
+
     function appendRole(role) {
       const el = document.createElement('div')
       el.className = 'msg ' + role
@@ -304,15 +416,18 @@ export class ChatPanel {
         }
         case 'assistantStart':
           activeAssistant = appendRole('assistant')
+          activeAssistant.raw = ''
           scrollToBottom()
           break
         case 'assistantChunk':
-          if (!activeAssistant) activeAssistant = appendRole('assistant')
-          activeAssistant.textContent += msg.text
+          if (!activeAssistant) { activeAssistant = appendRole('assistant'); activeAssistant.raw = '' }
+          activeAssistant.raw = (activeAssistant.raw || '') + msg.text
+          activeAssistant.innerHTML = renderMarkdown(activeAssistant.raw)
           scrollToBottom()
           break
         case 'assistantEnd': {
           if (activeAssistant) {
+            activeAssistant.innerHTML = renderMarkdown(activeAssistant.raw || '')
             const stop = document.createElement('span')
             stop.className = 'stop'
             stop.textContent = '— ' + (msg.stopReason || 'done')
@@ -366,6 +481,13 @@ export class ChatPanel {
     cancelBtn.addEventListener('click', () => vscode.postMessage({ type: 'cancel' }))
     document.getElementById('restart').addEventListener('click', () => vscode.postMessage({ type: 'restart' }))
     document.getElementById('stop').addEventListener('click', () => vscode.postMessage({ type: 'stop' }))
+    document.addEventListener('click', (e) => {
+      const a = e.target && e.target.closest ? e.target.closest('a') : null
+      if (a && a.getAttribute('href')) {
+        e.preventDefault()
+        vscode.postMessage({ type: 'openLink', url: a.getAttribute('href') })
+      }
+    })
   </script>
 </body>
 </html>`
